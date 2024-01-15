@@ -1,0 +1,191 @@
+﻿@page "/beer"
+@rendermode InteractiveServer
+
+<PageTitle>Beer</PageTitle>
+
+@using Microsoft.AspNetCore.Components
+@using Newtonsoft.Json
+
+<style>
+    body {
+        background-color: #b0c4de;
+        color: #000000;
+        margin: 0;
+        padding: 0;
+    }
+
+    .table-responsive {
+        background-color: #008080;
+        padding: 15px;
+        border-radius: 8px;
+        box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+    }
+
+    .table-striped tbody tr:nth-of-type(odd) {
+        background-color: #b0c4de;
+    }
+
+    .table-striped tbody tr:nth-of-type(even) {
+        background-color: #b0c4de;
+    }
+
+    .table-bordered th, .table-bordered td {
+        border-color: #ddd;
+    }
+
+    .thead-dark th {
+        background-color: #343a40;
+        color: #fff;
+    }
+
+    .table td {
+        background-color: #cd853f;
+        color: #000000;
+    }
+
+    .fixed-buttons {
+        position: fixed;
+        bottom: 10px;
+        left: 10px;
+    }
+</style>
+
+<div style="margin-bottom: 30px; margin-top: 80px; margin-right: 10px; margin-left: 10px;">
+    <input type="text" @oninput="FilterBeerList" placeholder="Cerca birre..." class="form-control" />
+</div>
+
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 10px; margin-bottom: 10px; margin-right: 10px; margin-left: 10px;">
+    @if (filteredBeer != null && filteredBeer.Any() && searchTerm != "")
+    {
+        @foreach (var beerItem in filteredBeer)
+        {
+            <div style="border: 1px solid #000000; width: 325px; height: 300px; padding: 15px; border-radius: 8px; box-shadow: 0 0 10px rgba(0, 0, 0, 0.1); background-color: #008080;">
+                <h4 style="text-align: center; color: #fffafa;">@(beerItem.GetValueOrDefault("name", "N/A"))</h4>
+                <a href="/beer/@beerItem.GetValueOrDefault("id", "N/A")"><img src="@beerItem.GetValueOrDefault("image_url", "N/A")" alt="Immagine della birra" style="max-width: 200px; max-height: 200px; display: block; margin: 0 auto;" /></a>
+            </div>
+        }
+    }
+    else if (beer != null && beer.Any() && searchTerm == "")
+    {
+        @foreach (var beerItem in beer)
+        {
+            <div style="border: 1px solid #000000; width: 325px; height: 300px; padding: 15px; border-radius: 8px; box-shadow: 0 0 10px rgba(0, 0, 0, 0.1); background-color: #008080;">
+                <h4 style="text-align: center; color: #fffafa;">@(beerItem.GetValueOrDefault("name", "N/A"))</h4>
+                <a href="/beer/@beerItem.GetValueOrDefault("id", "N/A")"><img src="@beerItem.GetValueOrDefault("image_url", "N/A")" alt="Immagine della birra" style="max-width: 200px; max-height: 200px; display: block; margin: 0 auto;" /></a>
+            </div>
+        }
+    }
+    else
+    {
+        <p style="color: #ff0000; font-weight: bold; text-align: center;">Nessuna birra corrispondente alla ricerca.</p>
+    }
+</div>
+
+<div class="fixed-buttons">
+    @if (searchTerm == "")
+    {
+        @if (page < 33)
+            {
+                <button class="btn btn-primary" @onclick="Count" style="display: inline-block; margin-right: 10px;" >Mostra altro</button>
+            }
+        @if (page > 1)
+        {
+            <button class="btn btn-primary" @onclick="CountLess" style="display: inline-block;">Mostra meno</button>
+        }
+    }
+</div>
+
+@code {
+
+    private int page = 1;
+    private int element = 10;
+    private int countItems = 0;
+    private string searchTerm = "";
+    private List<Dictionary<string, object>> beer = new();
+    private List<Dictionary<string, object>> filteredBeer = new();
+
+    private async Task CountLess()
+    {
+        page--;
+        await CallApiAsync(page, element);
+    }
+
+    private async Task Count()
+    {
+        page++;
+        await CallApiAsync(page, element);
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            await CallApiAsync(page, element);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Errore durante l'inizializzazione: {ex.Message}");
+        }
+    }
+
+    private async Task CallApiAsync(int page, int element)
+    {
+        string apiUrl = $"https://api.punkapi.com/v2/beers?page={page}&per_page={element}";
+        using (HttpClient httpClient = new HttpClient())
+        {
+            try
+            {
+                HttpResponseMessage response = await httpClient.GetAsync(apiUrl);
+                if (response.IsSuccessStatusCode)
+                {
+                    string result = await response.Content.ReadAsStringAsync();
+                    var newBeer = Newtonsoft.Json.JsonConvert.DeserializeObject<List<Dictionary<string, object>>>(result);
+                    if (newBeer != null)
+                        beer.AddRange(newBeer);
+                }
+                else
+                {
+                    Console.WriteLine($"Errore nella chiamata API. Status Code: {response.StatusCode}");
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Errore durante la chiamata API: {ex.Message}");
+            }
+        }
+    }
+
+    private async Task FilterBeerList(ChangeEventArgs e)
+    {
+        searchTerm = e.Value.ToString();
+        Console.WriteLine(searchTerm);
+        if (!string.IsNullOrWhiteSpace(searchTerm))
+        {
+            using (HttpClient httpClient = new HttpClient())
+            {
+                string apiUrl = $"https://api.punkapi.com/v2/beers?beer_name={searchTerm}";
+
+                try
+                {
+                    HttpResponseMessage response = await httpClient.GetAsync(apiUrl);
+
+                    if (response.IsSuccessStatusCode)
+                    {
+                        string result = await response.Content.ReadAsStringAsync();
+                        var newFilteredBeer = JsonConvert.DeserializeObject<List<Dictionary<string, object>>>(result);
+                        if (newFilteredBeer != null)
+                            filteredBeer = newFilteredBeer;
+                    }
+                    else
+                    {
+                        Console.WriteLine($"Errore nella chiamata API. Status Code: {response.StatusCode}");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Errore durante la chiamata API: {ex.Message}");
+                }
+            }
+        }
+    }
+}

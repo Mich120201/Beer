@@ -1,0 +1,182 @@
+﻿@page "/beer/{id}"
+
+<style>
+    body {
+        background-color: #b0c4de;
+        color: #000000;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .beer-details {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        gap: 20px;
+    }
+
+    .detail-section {
+        border: 1px solid #000000;
+        background-color: #008080;
+        padding: 15px;
+        border-radius: 8px;
+        box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+    }
+
+    .no-details {
+        color: #ff0000;
+        font-weight: bold;
+    }
+
+    .ingredient-section {
+        color: #fffafa;
+        background-color: #008080;
+    }
+
+    .ingredient-name {
+        color: #fffafa;
+        font-weight: bold;
+    }
+</style>
+
+<div style="margin-bottom: 100px; background-color: #b0c4de;"></div>
+
+@if (beerDetail != null)
+{
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 50px; margin-bottom: 50px; margin-right: 20px; margin-left: 20px;">
+        <div class="beer-details">
+            <div style="border: 1px solid #000000; padding: 15px; border-radius: 8px; box-shadow: 0 0 10px rgba(0, 0, 0, 0.1); background-color: #008080;">
+                <h1 style="font-weight: bold; color: #fffafa;">@(beerDetail.ContainsKey("name") ? beerDetail["name"] : "N/A")</h1>
+                <h3 style="color: #fffafa;">@(beerDetail.ContainsKey("tagline") ? beerDetail["tagline"] : "N/A")</h3>
+                <p style="color: #fffafa;">@(beerDetail.ContainsKey("description") ? beerDetail["description"] : "N/A")</p>
+                <img src="@(beerDetail.ContainsKey("image_url") ? beerDetail["image_url"] : "N/A")" alt="Immagine della birra" style="max-width: 200px; max-height: 200px;" />
+            </div>
+
+            <div class="detail-section">
+                <h3 style="color: #fffafa;">Dettagli aggiuntivi:</h3>
+                <div class="row">
+                    <div class="col-md-6">
+                        <p style="color: #fffafa;"><strong>First Brewed:</strong> @(beerDetail.ContainsKey("first_brewed") ? beerDetail["first_brewed"] : "N/A")</p>
+                        <p style="color: #fffafa;"><strong>ABV:</strong> @(beerDetail.ContainsKey("abv") ? beerDetail["abv"] : "N/A")</p>
+                        <p style="color: #fffafa;"><strong>IBU:</strong> @(beerDetail.ContainsKey("ibu") ? beerDetail["ibu"] : "N/A")</p>
+                        <p style="color: #fffafa;"><strong>TARGET FG:</strong> @(beerDetail.ContainsKey("target_fg") ? beerDetail["target_fg"] : "N/A")</p>
+                        <p style="color: #fffafa;"><strong>TARGET OG:</strong> @(beerDetail.ContainsKey("target_og") ? beerDetail["target_og"] : "N/A")</p>
+                    </div>
+                    <div class="col-md-6">
+                        <p style="color: #fffafa;"><strong>EBC:</strong> @(beerDetail.ContainsKey("ebc") ? beerDetail["ebc"] : "N/A")</p>
+                        <p style="color: #fffafa;"><strong>SRM:</strong> @(beerDetail.ContainsKey("srm") ? beerDetail["srm"] : "N/A")</p>
+                        <p style="color: #fffafa;"><strong>PH:</strong> @(beerDetail.ContainsKey("ph") ? beerDetail["ph"] : "N/A")</p>
+                        <p style="color: #fffafa;"><strong>ATTENUATION LEVEL:</strong> @(beerDetail.ContainsKey("attenuation_level") ? beerDetail["attenuation_level"] : "N/A")</p>
+                        <p style="color: #fffafa;"><strong>BREWERS TIPS:</strong> @(beerDetail.ContainsKey("brewers_tips") ? beerDetail["brewers_tips"] : "N/A")</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="detail-section">
+                <h3 style="color: #fffafa;">Ingredienti:</h3>
+
+                @if (beerDetail.ContainsKey("ingredients") && beerDetail["ingredients"] != null)
+                {
+                    Ingredients ingredients = Newtonsoft.Json.JsonConvert.DeserializeObject<Ingredients>(beerDetail["ingredients"].ToString());
+
+                    if (ingredients.Malt != null && ingredients.Malt.Any())
+                    {
+                        <h4 style="color: #fffafa;">Malti:</h4>
+                        <ul>
+                            @foreach (var malt in ingredients.Malt)
+                            {
+                                <li style="color: #fffafa;"><strong>@malt.Name:</strong> @malt.Amount.Value @malt.Amount.Unit</li>
+                            }
+                        </ul>
+                    }
+
+                    if (ingredients.Hops != null && ingredients.Hops.Any())
+                    {
+                        <h4 style="color: #fffafa;">Luppoli:</h4>
+                        <ul>
+                            @foreach (var hop in ingredients.Hops)
+                            {
+                                <li style="color: #fffafa;"><strong>@hop.Name:</strong> @hop.Amount.Value @hop.Amount.Unit</li>
+                            }
+                        </ul>
+                    }
+
+                    <h4 style="color: #fffafa;">Lievito:</h4>
+                    <p style="color: #fffafa;">@(string.IsNullOrWhiteSpace(ingredients.Yeast) ? "N/A" : ingredients.Yeast)</p>
+                }
+                else
+                {
+                    <p>Dettagli sugli ingredienti non disponibili.</p>
+                }
+            </div>
+        </div>
+    </div>
+}
+else
+{
+    <p class="no-details">Dettagli non disponibili.</p>
+}
+
+@code {
+    private Dictionary<string, object> beerDetail;
+    private List<Dictionary<string, object>> beerDetails;
+
+    [Parameter] public string id { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadBeerDetailAsync();
+    }
+
+    private async Task LoadBeerDetailAsync()
+    {
+        string apiUrl = $"https://api.punkapi.com/v2/beers/{id}";
+
+        using (HttpClient httpClient = new HttpClient())
+        {
+            try
+            {
+                HttpResponseMessage response = await httpClient.GetAsync(apiUrl);
+
+                if (response.IsSuccessStatusCode)
+                {
+                    string result = await response.Content.ReadAsStringAsync();
+                    beerDetails = Newtonsoft.Json.JsonConvert.DeserializeObject<List<Dictionary<string, object>>>(result);
+
+                    if (beerDetails != null && beerDetails.Count > 0)
+                    {
+                        beerDetail = beerDetails[0];
+                    }
+
+                    StateHasChanged();
+                }
+                else
+                {
+                    Console.WriteLine($"Errore nella chiamata API. Status Code: {response.StatusCode}");
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Errore durante la chiamata API: {ex.Message}");
+            }
+        }
+    }
+
+    public class Ingredient
+    {
+        public string Name { get; set; }
+        public Amount Amount { get; set; }
+    }
+
+    public class Amount
+    {
+        public double Value { get; set; }
+        public string Unit { get; set; }
+    }
+
+    public class Ingredients
+    {
+        public List<Ingredient> Malt { get; set; }
+        public List<Ingredient> Hops { get; set; }
+        public string Yeast { get; set; }
+    }
+}
